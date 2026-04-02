@@ -22,13 +22,10 @@ public class PlayerData {
 
     @Setter
     private SoundData currentPlayingSound;
-
     @Setter
     private Instant songStartInstant;
-
     @Setter
     private StateData currentPlayState = null;
-
     @Setter
     private StateData forcedState = null;
 
@@ -41,18 +38,18 @@ public class PlayerData {
     }
 
     public void changeState(StateData newState) {
-        plugin.getLogger().info("[DEBUG-AUDIO] " + player.getName() + " cambia stato: " +
-                (this.currentPlayState != null ? this.currentPlayState.getName() : "NULL") +
-                " -> " + (newState != null ? newState.getName() : "NULL"));
-
         if (this.currentPlayState != null && newState != null && this.currentPlayState.getName().equals(newState.getName())) {
             return;
         }
 
-        boolean isDeescalation = this.currentPlayState != null && newState != null && this.currentPlayState.getPriority() > newState.getPriority();
+        plugin.getLogger().info(String.format("[DEBUG-AUDIO] %s cambia stato: %s -> %s",
+                player.getName(),
+                (this.currentPlayState != null ? this.currentPlayState.getName() : "NULL"),
+                (newState != null ? newState.getName() : "NULL")));
 
-        // Salviamo una referenza allo stato VECCHIO prima di sovrascriverlo, ci serve per l'outro!
+        boolean isDeescalation = this.currentPlayState != null && newState != null && this.currentPlayState.getPriority() > newState.getPriority();
         StateData oldState = this.currentPlayState;
+
         this.currentPlayState = newState;
 
         if (this.transitionTask != null) {
@@ -66,31 +63,31 @@ public class PlayerData {
 
         if (newState != null) {
             if (isDeescalation) {
-                // ESECUZIONE DEL MASKING STINGER (OUTRO)
-                if (oldState != null && oldState.getOutroStinger() != null) {
-                    plugin.getLogger().info("[DEBUG-AUDIO] Esecuzione Outro Stinger: " + oldState.getOutroStinger().getId());
-                    player.playSound(player.getLocation(),
-                            oldState.getOutroStinger().getId(),
-                            SoundCategory.valueOf(oldState.getOutroStinger().getDefaultPlayCategory()),
-                            1F, 1F);
-                }
-
-                int delaySeconds = plugin.getConfig().getInt("deescalation_delay", 5);
-                long delayTicks = delaySeconds * 20L;
-
-                plugin.getLogger().info("[DEBUG-AUDIO] De-escalation rilevata. Attesa di " + delaySeconds + " secondi prima del prossimo brano.");
-
-                this.transitionTask = Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                    this.transitionTask = null;
-
-                    if (this.currentPlayState != null && this.currentPlayState.getName().equals(newState.getName())) {
-                        playRandomSoundFromState(newState);
-                    }
-                }, delayTicks);
+                executeDeescalationDelay(newState, oldState);
             } else {
                 playRandomSoundFromState(newState);
             }
         }
+    }
+
+    private void executeDeescalationDelay(StateData newState, StateData oldState) {
+        if (oldState.getOutroStinger() != null) {
+            plugin.getLogger().info(String.format("[DEBUG-AUDIO] Esecuzione Outro Stinger: %s", oldState.getOutroStinger().getId()));
+            player.playSound(player.getLocation(), oldState.getOutroStinger().getId(),
+                    SoundCategory.valueOf(oldState.getOutroStinger().getDefaultPlayCategory()), 1F, 1F);
+        }
+
+        int delaySeconds = plugin.getConfig().getInt("deescalation_delay", 5);
+        long delayTicks = delaySeconds * 20L;
+
+        plugin.getLogger().info(String.format("[DEBUG-AUDIO] De-escalation rilevata. Attesa di %d secondi.", delaySeconds));
+
+        this.transitionTask = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            this.transitionTask = null;
+            if (this.currentPlayState != null && this.currentPlayState.getName().equals(newState.getName())) {
+                playRandomSoundFromState(newState);
+            }
+        }, delayTicks);
     }
 
     public void playRandomSoundFromState(StateData state) {
@@ -104,7 +101,7 @@ public class PlayerData {
         if (validSounds.isEmpty()) return;
 
         SoundData selected = validSounds.get(ThreadLocalRandom.current().nextInt(0, validSounds.size()));
-        plugin.getLogger().info("[DEBUG-AUDIO] Selezionato e avviato suono: " + selected.getId());
+        plugin.getLogger().info(String.format("[DEBUG-AUDIO] Selezionato e avviato suono: %s", selected.getId()));
         playSound(selected, 1F, 1F);
     }
 
@@ -135,9 +132,7 @@ public class PlayerData {
     }
 
     public long getElapsedMilliseconds() {
-        if (songStartInstant == null) {
-            return 0;
-        }
+        if (songStartInstant == null) return 0;
         return ChronoUnit.MILLIS.between(songStartInstant, Instant.now());
     }
 }

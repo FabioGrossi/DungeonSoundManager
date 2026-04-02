@@ -24,7 +24,6 @@ import java.util.stream.Stream;
 
 public class ResourcePackManager {
 
-    private JsonObject soundsJson;
     private final SoundManager soundManager;
 
     @Getter
@@ -42,29 +41,41 @@ public class ResourcePackManager {
             try (Stream<Path> walk = Files.walk(destinationFolder)) {
                 walk.sorted(Comparator.reverseOrder())
                         .map(Path::toFile)
-                        .forEach(File::delete);
+                        .forEach(file -> {
+                            if (!file.delete()) {
+                                soundManager.getLogger().warning("Impossibile cancellare il file temporaneo: " + file.getName());
+                            }
+                        });
             }
         }
         ZipUtils.unzip(resourcePackFile, destinationFolder);
+
         Path soundsJsonFile = destinationFolder.resolve("assets/minecraft/sounds.json");
+        Path resourcePackSoundsFolder = destinationFolder.resolve("assets/minecraft/sounds");
+
+        loadSoundsCache(soundsJsonFile, resourcePackSoundsFolder);
+        loadStatesCache();
+    }
+
+    private void loadSoundsCache(Path soundsJsonFile, Path resourcePackSoundsFolder) throws IOException {
         if (!Files.exists(soundsJsonFile)) {
             throw new IOException("Resource pack does not contain sounds.json");
         }
-        soundsJson = new Gson().fromJson(new FileReader(soundsJsonFile.toFile()), JsonObject.class);
-        Path resourcePackSoundsFolder = destinationFolder.resolve("assets/minecraft/sounds");
         if (!Files.exists(resourcePackSoundsFolder)) {
             throw new IOException("Resource pack does not contain any sound");
         }
+
+        JsonObject soundsJson = new Gson().fromJson(new FileReader(soundsJsonFile.toFile()), JsonObject.class);
+
         soundsJson.asMap().forEach((internalSoundID, jsonElement) -> {
             JsonObject soundJsonObject = (JsonObject) jsonElement;
             String defaultPlayCategory = soundJsonObject.get("category").getAsString().toUpperCase(Locale.ROOT);
             JsonArray soundFilesList = soundJsonObject.getAsJsonArray("sounds");
-            if (soundFilesList.size() > 1) {
-                return;
-            }
+            if (soundFilesList.size() > 1) return;
+
             Path soundOggFile = resourcePackSoundsFolder.resolve(soundFilesList.get(0).getAsString() + ".ogg");
             if (!Files.exists(soundOggFile)) {
-                soundManager.getLogger().warning("Sound file " + soundOggFile + " does not exist");
+                soundManager.getLogger().warning(String.format("Sound file %s does not exist", soundOggFile));
                 return;
             }
             try {
@@ -72,14 +83,17 @@ public class ResourcePackManager {
                 SoundData soundData = new SoundData(internalSoundID, soundDuration, defaultPlayCategory);
                 soundDataCache.put(internalSoundID, soundData);
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                soundManager.getLogger().severe("Errore nella lettura dell'header ogg: " + e.getMessage());
             }
         });
+    }
 
+    private void loadStatesCache() {
         ConfigurationSection soundsConfig = soundManager.getConfig().getConfigurationSection("player_states");
         if (soundsConfig == null) {
-            throw new RuntimeException("Unable to find a player_states configuration section. Please regenerate the config file");
+            throw new IllegalStateException("Impossibile trovare la sezione player_states nel config.yml");
         }
+
         soundsConfig.getKeys(false).forEach(stateName -> {
             ConfigurationSection stateConditionSection = soundsConfig.getConfigurationSection(stateName + ".conditions");
             if (stateConditionSection == null) return;
@@ -88,16 +102,12 @@ public class ResourcePackManager {
             boolean assignAutomatically = soundsConfig.getBoolean(stateName + ".assignAutomatically", false);
             int priority = soundsConfig.getInt(stateName + ".priority", 0);
 
-            // LETTURA DELL'OUTRO STINGER
             String stingerConfigName = soundsConfig.getString(stateName + ".outro_stinger");
-            SoundData outroStinger = null;
-            if (stingerConfigName != null) {
-                outroStinger = getSoundData(stingerConfigName.replace("-", "."));
-            }
+            SoundData outroStinger = (stingerConfigName != null) ? getSoundData(stingerConfigName.replace("-", ".")) : null;
 
             ConfigurationSection soundsMap = soundsConfig.getConfigurationSection(stateName + ".sounds");
             if (soundsMap == null) {
-                soundManager.getLogger().warning("The state "+ stateName + " has no sounds section. Ignoring it");
+                soundManager.getLogger().warning(String.format("Lo stato %s non ha suoni. Viene ignorato.", stateName));
                 return;
             }
 
@@ -106,18 +116,16 @@ public class ResourcePackManager {
                 String soundName = soundNameRaw.replace("-", ".");
                 SoundData selectedSound = getSoundData(soundName);
                 if (selectedSound == null) {
-                    soundManager.getLogger().warning("Sound " + soundName + " doesn't exist");
+                    soundManager.getLogger().warning(String.format("Il suono %s non esiste.", soundName));
                     return;
                 }
 
                 SoundData.SoundConditions soundConditions = soundsMap.getSerializable(soundName + ".conditions", SoundData.SoundConditions.class);
-                if (soundConditions == null) {
-                    soundConditions = new SoundData.SoundConditions();
-                }
+                if (soundConditions == null) soundConditions = new SoundData.SoundConditions();
+
                 stateSoundData.put(selectedSound, soundConditions);
             });
 
-            // Inserito l'outroStinger nel costruttore
             StateData stateData = new StateData(stateName, assignAutomatically, priority, outroStinger, stateConditions, stateSoundData);
             stateDataCache.put(stateName, stateData);
         });

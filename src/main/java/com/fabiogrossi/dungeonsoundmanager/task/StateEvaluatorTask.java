@@ -21,66 +21,73 @@ public class StateEvaluatorTask extends BukkitRunnable {
     @Override
     public void run() {
         for (Player player : Bukkit.getOnlinePlayers()) {
-            PlayerData pd = soundManager.getPlayerManager().getPlayer(player);
-            if (pd == null) continue;
+            evaluatePlayerState(player);
+        }
+    }
 
-            StateData bestState = null;
-            int highestPriority = -1;
-            int highestConditionCount = -1;
+    private void evaluatePlayerState(Player player) {
+        PlayerData pd = soundManager.getPlayerManager().getPlayer(player);
+        if (pd == null) return;
 
-            // 1. STATI AMBIENTALI (Valuta Priorità e Specificità)
-            for (StateData state : soundManager.getResourcePackManager().getStateDataCache().values()) {
-                if (state.isAssignAutomatically() && state.getStateConditions().areVerified(pd)) {
-                    int currentConditions = state.getStateConditions().getSpecificConditionCount();
+        StateData bestState = pd.getForcedState();
+        if (bestState == null) {
+            bestState = calculateBestAutomaticState(player, pd);
+        }
 
-                    if (state.getPriority() > highestPriority) {
-                        highestPriority = state.getPriority();
-                        highestConditionCount = currentConditions;
-                        bestState = state;
-                    } else if (state.getPriority() == highestPriority) {
-                        // Se la priorità è uguale, vince lo stato che richiede più requisiti (es: notte + pioggia vince su solo notte)
-                        if (currentConditions > highestConditionCount) {
-                            highestConditionCount = currentConditions;
-                            bestState = state;
-                        }
-                    }
+        if (bestState != pd.getCurrentPlayState()) {
+            pd.changeState(bestState);
+        }
+    }
+
+    private StateData calculateBestAutomaticState(Player player, PlayerData pd) {
+        StateData bestState = null;
+        int highestPriority = -1;
+        int highestConditionCount = -1;
+
+        // 1. Valuta stati ambientali
+        for (StateData state : soundManager.getResourcePackManager().getStateDataCache().values()) {
+            if (state.isAssignAutomatically() && state.getStateConditions().areVerified(pd)) {
+                int currentConditions = state.getStateConditions().getSpecificConditionCount();
+                if (state.getPriority() > highestPriority) {
+                    highestPriority = state.getPriority();
+                    highestConditionCount = currentConditions;
+                    bestState = state;
+                } else if (state.getPriority() == highestPriority && currentConditions > highestConditionCount) {
+                    highestConditionCount = currentConditions;
+                    bestState = state;
                 }
-            }
-
-            // 2. STATI DI COMBATTIMENTO (MythicMobs)
-            for (Entity entity : player.getNearbyEntities(40, 40, 40)) {
-                ActiveMob am = MythicBukkit.inst().getMobManager().getActiveMob(entity.getUniqueId()).orElse(null);
-                if (am != null) {
-                    boolean inCombat = false;
-                    if (am.hasThreatTable()) {
-                        inCombat = am.getThreatTable().getAllThreatTargets().stream()
-                                .anyMatch(target -> target.getBukkitEntity().getUniqueId().equals(player.getUniqueId()));
-                    }
-                    if (!inCombat && am.getEntity().getTarget() != null) {
-                        inCombat = am.getEntity().getTarget().getUniqueId().equals(player.getUniqueId());
-                    }
-
-                    if (inCombat) {
-                        String mobStateName = soundManager.getConfig().getString("mob_states." + am.getType().getInternalName());
-                        if (mobStateName != null) {
-                            StateData combatState = soundManager.getResourcePackManager().getStateData(mobStateName);
-                            if (combatState != null && combatState.getPriority() > highestPriority) {
-                                highestPriority = combatState.getPriority();
-                                bestState = combatState;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. FORZATURA MANUALE
-            if (pd.getForcedState() != null) {
-                bestState = pd.getForcedState();
-            }
-
-            if (bestState != pd.getCurrentPlayState()) {
-                pd.changeState(bestState);
             }
         }
+
+        // 2. Valuta combattimento MythicMobs
+        for (Entity entity : player.getNearbyEntities(40, 40, 40)) {
+            StateData combatState = getCombatStateFromEntity(entity, player);
+            if (combatState != null && combatState.getPriority() > highestPriority) {
+                highestPriority = combatState.getPriority();
+                bestState = combatState;
+            }
+        }
+
+        return bestState;
+    }
+
+    @SuppressWarnings("resource")
+    private StateData getCombatStateFromEntity(Entity entity, Player player) {
+        ActiveMob am = MythicBukkit.inst().getMobManager().getActiveMob(entity.getUniqueId()).orElse(null);
+        if (am != null && isPlayerInCombatWithMob(am, player)) {
+            String mobStateName = soundManager.getConfig().getString("mob_states." + am.getType().getInternalName());
+            if (mobStateName != null) {
+                return soundManager.getResourcePackManager().getStateData(mobStateName);
+            }
+        }
+        return null;
+    }
+
+    private boolean isPlayerInCombatWithMob(ActiveMob am, Player player) {
+        if (am.hasThreatTable()) {
+            return am.getThreatTable().getAllThreatTargets().stream()
+                    .anyMatch(target -> target.getBukkitEntity().getUniqueId().equals(player.getUniqueId()));
+        }
+        return am.getEntity().getTarget() != null && am.getEntity().getTarget().getUniqueId().equals(player.getUniqueId());
     }
 }

@@ -18,6 +18,7 @@ import java.util.Arrays;
 
 @CommandAlias("sm")
 @CommandPermission("dungeonsoundmanager.admin")
+@SuppressWarnings("unused")
 public class SoundManagerCommand extends BaseCommand {
 
     private final SoundManager soundManager;

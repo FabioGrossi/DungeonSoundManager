@@ -3,9 +3,9 @@ package com.fabiogrossi.dungeonsoundmanager;
 import co.aikar.commands.BukkitCommandCompletionContext;
 import co.aikar.commands.CommandCompletions;
 import co.aikar.commands.PaperCommandManager;
+import com.comphenix.protocol.ProtocolLibrary;
 import com.comphenix.protocol.ProtocolManager;
 import com.fabiogrossi.dungeonsoundmanager.command.SoundManagerCommand;
-import com.fabiogrossi.dungeonsoundmanager.managers.EventManager;
 import com.fabiogrossi.dungeonsoundmanager.managers.PlayerManager;
 import com.fabiogrossi.dungeonsoundmanager.managers.ResourcePackManager;
 import com.fabiogrossi.dungeonsoundmanager.task.SongCarouselBroadcastTask;
@@ -18,6 +18,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.logging.Level;
 
 @Getter
 public class SoundManager extends JavaPlugin {
@@ -29,43 +31,42 @@ public class SoundManager extends JavaPlugin {
     @Override
     public void onEnable() {
         try {
-            // Salva il config preservando i commenti senza mai sovrascriverlo brutalmente
             saveDefaultConfig();
+            protocolManager = ProtocolLibrary.getProtocolManager();
+
+            String tempDir = getConfig().getString("resource_pack_temp_directory", "temp");
+            String packName = getConfig().getString("resource_pack", "Skyrim.zip");
 
             resourcePackManager = new ResourcePackManager(this);
             resourcePackManager.processResourcePack(
-                    getDataFolder().toPath().resolve(getConfig().getString("resource_pack_temp_directory")),
-                    getDataFolder().toPath().resolve(getConfig().getString("resource_pack"))
+                    getDataFolder().toPath().resolve(tempDir),
+                    getDataFolder().toPath().resolve(packName)
             );
-
-            // RIMOSSO IL SAVE_CONFIG() DISTRUTTIVO CHE CANCELLAVA I COMMENTI
 
             PaperCommandManager paperCommandManager = new PaperCommandManager(this);
             CommandCompletions<BukkitCommandCompletionContext> completionContext = paperCommandManager.getCommandCompletions();
             registerCommands(paperCommandManager, completionContext);
-
-            Bukkit.getPluginManager().registerEvents(new EventManager(this), this);
 
             playerManager = new PlayerManager(this);
 
             new SongCarouselBroadcastTask(this).runTaskTimer(this, 0, 20 * 5);
             new StateEvaluatorTask(this).runTaskTimer(this, 0, 20);
 
-            // Avvia la validazione per avvisarti di errori
             validateConfig();
 
         } catch (IOException e) {
-            e.printStackTrace();
+            getLogger().log(Level.SEVERE, "Impossibile caricare la Resource Pack!", e);
         }
     }
 
+    @SuppressWarnings("resource")
     public void validateConfig() {
         getLogger().info("[VALIDAZIONE] Controllo integrità configurazioni...");
         ConfigurationSection mobStates = getConfig().getConfigurationSection("mob_states");
         if (mobStates != null) {
             for (String mobName : mobStates.getKeys(false)) {
                 if (MythicBukkit.inst().getMobManager().getMythicMob(mobName).isEmpty()) {
-                    getLogger().warning("[ATTENZIONE] Il mob '" + mobName + "' in config.yml non esiste in MythicMobs! La musica non partirà.");
+                    getLogger().warning(String.format("[ATTENZIONE] Il mob '%s' in config.yml non esiste in MythicMobs!", mobName));
                 }
             }
         }
@@ -93,24 +94,24 @@ public class SoundManager extends JavaPlugin {
         if (resourcePackManager != null) {
             resourcePackManager.getSoundDataCache().clear();
             resourcePackManager.getStateDataCache().clear();
-        }
 
-        try {
-            resourcePackManager.processResourcePack(
-                    getDataFolder().toPath().resolve(getConfig().getString("resource_pack_temp_directory")),
-                    getDataFolder().toPath().resolve(getConfig().getString("resource_pack"))
-            );
-        } catch (IOException e) {
-            getLogger().severe("Errore critico durante l'estrazione della Resource Pack: " + e.getMessage());
-            e.printStackTrace();
-            return;
+            try {
+                String tempDir = getConfig().getString("resource_pack_temp_directory", "temp");
+                String packName = getConfig().getString("resource_pack", "Skyrim.zip");
+                Path tempPath = getDataFolder().toPath().resolve(tempDir);
+                Path packPath = getDataFolder().toPath().resolve(packName);
+
+                resourcePackManager.processResourcePack(tempPath, packPath);
+            } catch (IOException e) {
+                getLogger().log(Level.SEVERE, "Errore critico durante l'estrazione della Resource Pack", e);
+                return;
+            }
         }
 
         new SongCarouselBroadcastTask(this).runTaskTimer(this, 0, 20 * 5);
         new StateEvaluatorTask(this).runTaskTimer(this, 0, 20);
 
         validateConfig();
-
         getLogger().info("Ricaricamento completato con successo!");
     }
 
@@ -119,5 +120,7 @@ public class SoundManager extends JavaPlugin {
     }
 
     @Override
-    public void onDisable() {}
+    public void onDisable() {
+        // Nessuna logica di spegnimento necessaria al momento
+    }
 }

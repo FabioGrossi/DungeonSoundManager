@@ -33,17 +33,4 @@ public class PlayerManager {
     public void removePlayer(Player player) {
         playerCache.remove(player);
     }
-
-    public PlayerData getPlayerPlayingSound(SoundData soundData) {
-        for (PlayerData playerData : playerCache.values()) {
-            Player player = playerData.getPlayer();
-            if (player == null || !player.isOnline()) {
-                return null;
-            }
-            if (playerData.getCurrentPlayingSound() != null && playerData.getCurrentPlayingSound().equals(soundData)) {
-                return playerData;
-            }
-        }
-        return null;
-    }
 }
