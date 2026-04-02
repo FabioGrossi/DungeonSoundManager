@@ -1,0 +1,7 @@
+name: DungeonSoundManager
+main: com.fabiogrossi.dungeonsoundmanager.SoundManager
+description: Plugin to manage sounds in MythicDungeons
+version: "1.0.0-SNAPSHOT"
+depend:
+  - ProtocolLib
+  - MythicMobs
