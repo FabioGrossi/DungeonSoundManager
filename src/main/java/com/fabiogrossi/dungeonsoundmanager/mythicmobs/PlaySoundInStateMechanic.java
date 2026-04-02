@@ -70,11 +70,11 @@ public class PlaySoundInStateMechanic extends SkillMechanic implements ITargeted
             selectedSound = stateSounds.keySet().stream().toList().get(ThreadLocalRandom.current().nextInt(0, stateSounds.size()));
         }
         System.out.println("PlayerData MECHANIC1: " + playerData.toString());
-        System.out.println("CURRENTPLY PLAYING: " + playerData.getCurrentPlayingSound().getId());
-        if (playerData.getCurrentPlayingSound().getId() != null) {
-            System.out.print("Current playing song is not null. stopping it");
+        if (playerData.getCurrentPlayingSound() != null && playerData.getCurrentPlayingSound().getId() != null) {
+            System.out.println("Current playing song is not null. stopping it");
             playerData.stopSound(playerData.getCurrentPlayingSound());
         }
+        playerData.setCurrentPlayState(stateData);
         playerData.playSound(selectedSound, volume, pitch);
         System.out.println("PlayerData MECHANIC2: " + playerData.toString());
         return SkillResult.SUCCESS;

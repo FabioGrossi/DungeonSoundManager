@@ -9,8 +9,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import lombok.Getter;
-import org.bukkit.Sound;
-import org.bukkit.SoundCategory;
 import org.bukkit.configuration.ConfigurationSection;
 
 import java.io.File;
@@ -27,7 +25,6 @@ import java.util.stream.Stream;
 public class ResourcePackManager {
 
     private JsonObject soundsJson;
-
     private final SoundManager soundManager;
 
     @Getter
@@ -79,23 +76,31 @@ public class ResourcePackManager {
             }
         });
 
-
         ConfigurationSection soundsConfig = soundManager.getConfig().getConfigurationSection("player_states");
         if (soundsConfig == null) {
             throw new RuntimeException("Unable to find a player_states configuration section. Please regenerate the config file");
         }
         soundsConfig.getKeys(false).forEach(stateName -> {
             ConfigurationSection stateConditionSection = soundsConfig.getConfigurationSection(stateName + ".conditions");
-            if (stateConditionSection == null) {
-                return;
-            }
+            if (stateConditionSection == null) return;
+
             StateData.StateConditions stateConditions = StateData.StateConditions.from(stateConditionSection);
-            boolean assignAutomatically = soundsConfig.getBoolean(stateName + "assignAutomatically");
+            boolean assignAutomatically = soundsConfig.getBoolean(stateName + ".assignAutomatically", false);
+            int priority = soundsConfig.getInt(stateName + ".priority", 0);
+
+            // LETTURA DELL'OUTRO STINGER
+            String stingerConfigName = soundsConfig.getString(stateName + ".outro_stinger");
+            SoundData outroStinger = null;
+            if (stingerConfigName != null) {
+                outroStinger = getSoundData(stingerConfigName.replace("-", "."));
+            }
+
             ConfigurationSection soundsMap = soundsConfig.getConfigurationSection(stateName + ".sounds");
             if (soundsMap == null) {
                 soundManager.getLogger().warning("The state "+ stateName + " has no sounds section. Ignoring it");
                 return;
             }
+
             Map<SoundData, SoundData.SoundConditions> stateSoundData = new HashMap<>();
             soundsMap.getKeys(false).forEach(soundNameRaw -> {
                 String soundName = soundNameRaw.replace("-", ".");
@@ -104,19 +109,25 @@ public class ResourcePackManager {
                     soundManager.getLogger().warning("Sound " + soundName + " doesn't exist");
                     return;
                 }
-                SoundData.SoundConditions soundConditions = soundsMap.getSerializable(soundName + "conditions", SoundData.SoundConditions.class);
+
+                SoundData.SoundConditions soundConditions = soundsMap.getSerializable(soundName + ".conditions", SoundData.SoundConditions.class);
+                if (soundConditions == null) {
+                    soundConditions = new SoundData.SoundConditions();
+                }
                 stateSoundData.put(selectedSound, soundConditions);
             });
-            StateData stateData = new StateData(stateName, assignAutomatically, stateConditions, stateSoundData);
+
+            // Inserito l'outroStinger nel costruttore
+            StateData stateData = new StateData(stateName, assignAutomatically, priority, outroStinger, stateConditions, stateSoundData);
             stateDataCache.put(stateName, stateData);
         });
-
     }
 
     public SoundData getSoundData(String soundID) {
         return soundDataCache.get(soundID);
     }
 
-    public StateData getStateData(String stateName) {return stateDataCache.get(stateName);}
-
+    public StateData getStateData(String stateName) {
+        return stateDataCache.get(stateName);
+    }
 }

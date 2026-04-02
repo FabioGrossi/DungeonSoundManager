@@ -19,7 +19,6 @@ public class SoundData {
 
     private final String id;
     private final long duration; // Milliseconds
-
     private final String defaultPlayCategory;
 
     @Getter
@@ -35,19 +34,23 @@ public class SoundData {
         public boolean areVerified(PlayerData playerData) {
             Player player = playerData.getPlayer();
             World world = player.getWorld();
+
             if (nightRequired && (WorldUtils.isDay(world))) {
                 return false;
             }
             if (dayRequired && (!WorldUtils.isDay(world))) {
                 return false;
             }
-            if (!player.getLocation().getBlock().getBiome().equals(biome)) {
+            // FIX: Ora controlla se il bioma esiste prima di fare l'equals!
+            if (biome != null && !player.getLocation().getBlock().getBiome().equals(biome)) {
                 return false;
             }
-            if (player.getLocation().getBlock().getY() > 70 && player.getLocation().getBlock().getLightFromSky() > 1) {
+            // FIX: Ora controlla la variabile undergroundRequired!
+            if (undergroundRequired && player.getLocation().getBlock().getY() > 70 && player.getLocation().getBlock().getLightFromSky() > 1) {
                 return false;
             }
-            if (!playerData.getCurrentPlayState().getName().equalsIgnoreCase(playState)) {
+            // FIX: Ora controlla se lo stato richiesto non è nullo!
+            if (playState != null && (playerData.getCurrentPlayState() == null || !playerData.getCurrentPlayState().getName().equalsIgnoreCase(playState))) {
                 return false;
             }
             return true;

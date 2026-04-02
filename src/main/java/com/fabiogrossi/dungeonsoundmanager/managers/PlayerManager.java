@@ -4,10 +4,8 @@ import com.fabiogrossi.dungeonsoundmanager.SoundManager;
 import com.fabiogrossi.dungeonsoundmanager.data.PlayerData;
 import com.fabiogrossi.dungeonsoundmanager.data.SoundData;
 import lombok.Getter;
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,7 +21,8 @@ public class PlayerManager {
     }
 
     public void addPlayer(Player player, SoundData currentPlayingSound) {
-        PlayerData playerData = new PlayerData(player, currentPlayingSound);
+        // FIX: Ora passiamo il soundManager alla PlayerData per gestire i delay
+        PlayerData playerData = new PlayerData(soundManager, player, currentPlayingSound);
         playerCache.put(player, playerData);
     }
 
@@ -41,11 +40,10 @@ public class PlayerManager {
             if (player == null || !player.isOnline()) {
                 return null;
             }
-            if (playerData.getCurrentPlayingSound().equals(soundData)) {
+            if (playerData.getCurrentPlayingSound() != null && playerData.getCurrentPlayingSound().equals(soundData)) {
                 return playerData;
             }
         }
         return null;
     }
-
 }

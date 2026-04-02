@@ -1,0 +1,56 @@
+# ========================================== #
+#          DUNGEON SOUND MANAGER             #
+# ========================================== #
+
+resource_pack: "Skyrim.zip"
+resource_pack_temp_directory: "temp"
+
+# Tempo di attesa (in secondi) in silenzio dopo un combattimento
+deescalation_delay: 5
+
+# ========================================== #
+#               MOB STATES                   #
+# ========================================== #
+# Mappa il nome interno del MythicMob allo stato musicale.
+# Il plugin verifichera' all'avvio se questi mob esistono davvero!
+mob_states:
+  Dragur: "combat_normal"
+  DragonBoss: "bossfight_dragon"
+
+# ========================================== #
+#             PLAYER STATES                  #
+# ========================================== #
+# priority: Determina chi vince se due stati sono validi (es. combat > ambient)
+# assignAutomatically: Se true, il plugin glielo assegna se rispetta le conditions.
+# Se piu' stati automatici sono validi, vince quello con PIU' condizioni specificate.
+player_states:
+  ambient_night:
+    assignAutomatically: true
+    priority: 10
+    conditions:
+      nightRequired: true
+      # NUOVE CONDIZIONI DISPONIBILI:
+      # dayRequired: false
+      # stormRequired: false
+      # rainRequired: false
+      # clearWeatherRequired: false
+      # inWaterRequired: false
+      # sneakingRequired: false
+      # minY: 0
+      # maxY: 256
+      # minHealth: 1.0
+      # maxHealth: 20.0
+      # worldName: "world_nether"
+      # biome: "FOREST"
+    sounds:
+      "custom-skyrim-music-ambient-secunda":
+        conditions: {}
+  
+  combat_normal:
+    assignAutomatically: false
+    priority: 50
+    # outro_stinger: "custom-skyrim-ui-sneak_attack" # (Decommenta quando lo avrai nel resource pack)
+    conditions: {}
+    sounds:
+      "custom-skyrim-music-combat-steel_on_steel":
+        conditions: {}
