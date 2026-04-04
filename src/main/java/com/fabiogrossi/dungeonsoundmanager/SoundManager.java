@@ -50,7 +50,6 @@ public class SoundManager extends JavaPlugin {
 
             playerManager = new PlayerManager(this);
 
-            // ECCO LA RIGA MANCANTE DA INSERIRE:
             Bukkit.getPluginManager().registerEvents(new EventManager(this), this);
 
             new SongCarouselBroadcastTask(this).runTaskTimer(this, 0, 20 * 5);
@@ -66,6 +65,8 @@ public class SoundManager extends JavaPlugin {
     @SuppressWarnings("resource")
     public void validateConfig() {
         getLogger().info("[VALIDAZIONE] Controllo integrità configurazioni...");
+
+        // 1. Validazione MythicMobs originale
         ConfigurationSection mobStates = getConfig().getConfigurationSection("mob_states");
         if (mobStates != null) {
             for (String mobName : mobStates.getKeys(false)) {
@@ -73,6 +74,47 @@ public class SoundManager extends JavaPlugin {
                     getLogger().warning(String.format("[ATTENZIONE] Il mob '%s' in config.yml non esiste in MythicMobs!", mobName));
                 }
             }
+        }
+
+        // 2. Validazione Suoni (Missing Sounds Detector)
+        int missingSounds = 0;
+        ConfigurationSection statesSection = getConfig().getConfigurationSection("player_states");
+
+        if (statesSection != null && resourcePackManager != null) {
+            for (String stateName : statesSection.getKeys(false)) {
+                ConfigurationSection state = statesSection.getConfigurationSection(stateName);
+                if (state == null) continue;
+
+                // Controllo Outro Stinger
+                if (state.contains("outro_stinger")) {
+                    String stingerConfig = state.getString("outro_stinger");
+                    if (stingerConfig != null) {
+                        String stingerJson = stingerConfig.replace("-", ".");
+                        if (!resourcePackManager.hasSound(stingerJson)) {
+                            getLogger().warning(String.format("⚠ ERRORE: L'outro_stinger '%s' nello stato '%s' NON ESISTE nello ZIP o nel sounds.json!", stingerConfig, stateName));
+                            missingSounds++;
+                        }
+                    }
+                }
+
+                // Controllo Musiche
+                ConfigurationSection sounds = state.getConfigurationSection("sounds");
+                if (sounds != null) {
+                    for (String soundConfig : sounds.getKeys(false)) {
+                        String soundJson = soundConfig.replace("-", ".");
+                        if (!resourcePackManager.hasSound(soundJson)) {
+                            getLogger().warning(String.format("⚠ ERRORE: La canzone '%s' nello stato '%s' NON ESISTE nello ZIP o nel sounds.json!", soundConfig, stateName));
+                            missingSounds++;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (missingSounds > 0) {
+            getLogger().severe("❌ TROVATI " + missingSounds + " SUONI MANCANTI! Le tracce segnalate saranno mute nel gioco.");
+        } else {
+            getLogger().info("✅ Validazione suoni superata!");
         }
     }
 
@@ -125,6 +167,14 @@ public class SoundManager extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        // Nessuna logica di spegnimento necessaria al momento
+        if (playerManager != null) {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                com.fabiogrossi.dungeonsoundmanager.data.PlayerData pd = playerManager.getPlayer(player);
+                if (pd != null && pd.getCurrentPlayingSound() != null) {
+                    pd.stopSound(pd.getCurrentPlayingSound());
+                }
+            }
+            playerManager.getPlayerCache().clear();
+        }
     }
 }

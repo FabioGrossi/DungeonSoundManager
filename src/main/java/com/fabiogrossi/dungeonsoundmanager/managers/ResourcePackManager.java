@@ -8,6 +8,7 @@ import com.fabiogrossi.dungeonsoundmanager.utils.ZipUtils;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonElement;
 import lombok.Getter;
 import org.bukkit.configuration.ConfigurationSection;
 
@@ -69,11 +70,22 @@ public class ResourcePackManager {
 
         soundsJson.asMap().forEach((internalSoundID, jsonElement) -> {
             JsonObject soundJsonObject = (JsonObject) jsonElement;
-            String defaultPlayCategory = soundJsonObject.get("category").getAsString().toUpperCase(Locale.ROOT);
-            JsonArray soundFilesList = soundJsonObject.getAsJsonArray("sounds");
-            if (soundFilesList.size() > 1) return;
 
-            Path soundOggFile = resourcePackSoundsFolder.resolve(soundFilesList.get(0).getAsString() + ".ogg");
+            // FIX ANTI-CRASH: Controllo se la categoria esiste. Se non c'è, usa "MASTER"
+            String defaultPlayCategory = "MASTER";
+            if (soundJsonObject.has("category") && !soundJsonObject.get("category").isJsonNull()) {
+                defaultPlayCategory = soundJsonObject.get("category").getAsString().toUpperCase(Locale.ROOT);
+            }
+
+            if (!soundJsonObject.has("sounds")) return;
+
+            JsonArray soundFilesList = soundJsonObject.getAsJsonArray("sounds");
+            if (soundFilesList.isEmpty() || soundFilesList.size() > 1) return;
+
+            JsonElement firstSound = soundFilesList.get(0);
+            String soundFileName = firstSound.isJsonObject() ? firstSound.getAsJsonObject().get("name").getAsString() : firstSound.getAsString();
+
+            Path soundOggFile = resourcePackSoundsFolder.resolve(soundFileName + ".ogg");
             if (!Files.exists(soundOggFile)) {
                 soundManager.getLogger().warning(String.format("Sound file %s does not exist", soundOggFile));
                 return;
@@ -129,6 +141,15 @@ public class ResourcePackManager {
             StateData stateData = new StateData(stateName, assignAutomatically, priority, outroStinger, stateConditions, stateSoundData);
             stateDataCache.put(stateName, stateData);
         });
+    }
+
+    /**
+     * Verifica se un suono è stato caricato con successo dal sounds.json.
+     * Questa funzione viene chiamata dal SoundManager durante la validazione.
+     */
+    public boolean hasSound(String soundName) {
+        if (soundDataCache == null || soundDataCache.isEmpty()) return false;
+        return soundDataCache.containsKey(soundName);
     }
 
     public SoundData getSoundData(String soundID) {
