@@ -6,6 +6,7 @@ import co.aikar.commands.PaperCommandManager;
 import com.comphenix.protocol.ProtocolLibrary;
 import com.comphenix.protocol.ProtocolManager;
 import com.fabiogrossi.dungeonsoundmanager.command.SoundManagerCommand;
+import com.fabiogrossi.dungeonsoundmanager.managers.EventManager;
 import com.fabiogrossi.dungeonsoundmanager.managers.PlayerManager;
 import com.fabiogrossi.dungeonsoundmanager.managers.ResourcePackManager;
 import com.fabiogrossi.dungeonsoundmanager.task.SongCarouselBroadcastTask;
@@ -48,6 +49,9 @@ public class SoundManager extends JavaPlugin {
             registerCommands(paperCommandManager, completionContext);
 
             playerManager = new PlayerManager(this);
+
+            // ECCO LA RIGA MANCANTE DA INSERIRE:
+            Bukkit.getPluginManager().registerEvents(new EventManager(this), this);
 
             new SongCarouselBroadcastTask(this).runTaskTimer(this, 0, 20 * 5);
             new StateEvaluatorTask(this).runTaskTimer(this, 0, 20);
