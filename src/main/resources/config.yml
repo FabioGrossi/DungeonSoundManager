@@ -14,8 +14,9 @@ deescalation_delay: 5
 # Mappa il nome interno del MythicMob allo stato musicale.
 # Il plugin verifichera' all'avvio se questi mob esistono davvero!
 mob_states:
-  Dragur: "combat_normal"
-  DragonBoss: "bossfight_dragon"
+  Dragur:
+    state: "combat_normal"
+    lose_target_delay: 15
 
 # ========================================== #
 #             PLAYER STATES                  #

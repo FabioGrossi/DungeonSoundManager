@@ -73,6 +73,12 @@ public class SoundManager extends JavaPlugin {
                 if (MythicBukkit.inst().getMobManager().getMythicMob(mobName).isEmpty()) {
                     getLogger().warning(String.format("[ATTENZIONE] Il mob '%s' in config.yml non esiste in MythicMobs!", mobName));
                 }
+                String mappedState = getConfig().getString("mob_states." + mobName + ".state");
+                if (mappedState == null) {
+                    getLogger().warning(String.format("[ATTENZIONE] Il mob '%s' non ha il campo 'state' in mob_states!", mobName));
+                } else if (resourcePackManager.getStateData(mappedState) == null) {
+                    getLogger().warning(String.format("[ATTENZIONE] Il mob '%s' è mappato a '%s' ma quello stato non esiste in player_states!", mobName, mappedState));
+                }
             }
         }
 
