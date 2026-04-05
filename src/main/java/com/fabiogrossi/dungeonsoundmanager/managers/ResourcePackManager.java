@@ -66,12 +66,15 @@ public class ResourcePackManager {
             throw new IOException("Resource pack does not contain any sound");
         }
 
-        JsonObject soundsJson = new Gson().fromJson(new FileReader(soundsJsonFile.toFile()), JsonObject.class);
+        JsonObject soundsJson;
+        // Inseriamo il FileReader nel try per chiuderlo in automatico a fine lettura!
+        try (FileReader reader = new FileReader(soundsJsonFile.toFile())) {
+            soundsJson = new Gson().fromJson(reader, JsonObject.class);
+        }
 
         soundsJson.asMap().forEach((internalSoundID, jsonElement) -> {
             JsonObject soundJsonObject = (JsonObject) jsonElement;
 
-            // FIX ANTI-CRASH: Controllo se la categoria esiste. Se non c'è, usa "MASTER"
             String defaultPlayCategory = "MASTER";
             if (soundJsonObject.has("category") && !soundJsonObject.get("category").isJsonNull()) {
                 defaultPlayCategory = soundJsonObject.get("category").getAsString().toUpperCase(Locale.ROOT);
